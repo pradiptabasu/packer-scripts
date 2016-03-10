@@ -1,0 +1,136 @@
+{
+	"variables": {
+		"ssh_name": "pradipta",
+		"ssh_pass": "welcome1",
+		"hostname": "packer-test",
+		"packer_home": "{{env `PACKER_HOME`}}"
+	},
+
+	"builders": [{
+		"type": "virtualbox-iso",
+		"guest_os_type": "Ubuntu_64",
+		"communicator": "ssh",
+		"vm_name": "pradipta_Ubuntu_1404_server_x64_vBox-basic",
+		"format": "ova",
+		"hard_drive_interface": "sata",
+		"boot_wait": "4s",
+		"disk_size": 10000,
+
+		"vboxmanage": [
+			["modifyvm", "{{.Name}}", "--vram", "32"],
+			["modifyvm", "{{.Name}}", "--accelerate3d", "on"],
+			["modifyvm", "{{.Name}}", "--memory", "1024"],
+			["modifyvm", "{{.Name}}", "--cpus", "1"],
+			["modifyvm", "{{.Name}}", "--usb", "on"],
+			["modifyvm", "{{.Name}}", "--usbehci", "on"],
+			["modifyvm", "{{.Name}}", "--mouse", "usb"],
+			["modifyvm", "{{.Name}}", "--keyboard", "usb"],
+			["modifyvm", "{{.Name}}", "--nic1", "nat"],
+			["modifyvm", "{{.Name}}", "--nic2", "hostonly"],
+			["modifyvm", "{{.Name}}", "--nicpromisc1", "deny"],
+			["modifyvm", "{{.Name}}", "--nicpromisc2", "deny"],
+			["modifyvm", "{{.Name}}", "--nictype1", "82540EM"],
+			["modifyvm", "{{.Name}}", "--nictype2", "82540EM"],
+			["modifyvm", "{{.Name}}", "--cableconnected1", "on"],
+			["modifyvm", "{{.Name}}", "--cableconnected2", "off"],
+			["modifyvm", "{{.Name}}", "--hostonlyadapter2", "VirtualBox Host-Only Ethernet Adapter"],
+			["modifyvm", "{{.Name}}", "--natpf1", "guestssh,tcp,,2222,,22"]
+		],
+
+		"iso_url": "file:///D:/PackerPocDir/ubuntu-14.04.4-server-amd64.iso",
+		"iso_checksum": "2ac1f3e0de626e54d05065d6f549fa3a",
+		"iso_checksum_type": "md5",
+
+		"http_directory": ".",
+		"http_port_min": 9002,
+		"http_port_max": 9002,
+
+		"ssh_username": "{{user `ssh_name`}}",
+		"ssh_password": "{{user `ssh_pass`}}",
+		"ssh_wait_timeout": "30m",
+		"ssh_port": 22,
+		"ssh_pty" : "true",
+
+		"guest_additions_mode": "attach",
+
+		"headless": false,
+		"virtualbox_version_file": ".vbox_version",
+
+		"shutdown_command": "echo {{user `ssh_pass`}} | sudo -S shutdown -P now",
+
+		"boot_command": [
+			"<esc><esc><enter><wait>",
+			"/install/vmlinuz noapic ",
+			"preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/pradipta_Ubuntu_1404_server_x64_vBox-basic-preseed.cfg <wait>",
+			"debian-installer=en_US auto locale=en_US kbd-chooser/method=us <wait>",
+			"netcfg/choose_interface=eth0 ",
+			"biosdevname=0 ",
+			"hostname={{user `hostname`}} <wait>",
+			"fb=false debconf/frontend=noninteractive ",
+			"keyboard-configuration/modelcode=SKIP keyboard-configuration/layout=USA ",
+			"keyboard-configuration/variant=USA console-setup/ask_detect=false ",
+			"initrd=/install/initrd.gz -- <enter><wait>"
+		]
+	}],
+
+	"provisioners": [
+	{
+		"type": "shell",
+		"execute_command": "echo {{user `ssh_pass`}} | sudo -E -S sh '{{.Path}}'",
+		"inline": [
+			"echo '{{user `ssh_name`}} ALL=NOPASSWD:ALL' >> /etc/sudoers"
+		]
+	},
+	{
+		"type": "shell",
+		"script": "scripts/password_less_users.sh",
+		"override": {
+			"virtualbox-iso": {
+				"execute_command": "echo {{user `ssh_pass`}} | sudo -E -S sh '{{.Path}}'"
+			}
+		}
+	},
+	{
+		"type": "shell",
+		"script": "scripts/vboxguest.sh",
+		"override": {
+			"virtualbox-iso": {
+				"execute_command": "echo {{user `ssh_pass`}} | sudo -E -S sh '{{.Path}}'"
+			}
+		}
+	},
+	{
+		"type": "shell",
+		"inline": [
+			"echo 'Hello World Starting'",
+			"sleep 30"
+		]
+		
+	},
+	{
+		"type": "shell",
+		"scripts": [
+			"scripts/root_setup.sh",
+			"scripts/script.sh"
+		]
+	},
+	{
+		"type": "shell",
+		"inline": [
+			"echo 'Hello World'",
+			"sleep 30"
+		]
+	}],
+	
+	"post-processors": [
+	{
+		"type": "vagrant",
+		"keep_input_artifact": true ,
+		"override": {
+			"virtualbox-iso": {
+				"output":"vagrant_output/virtualbox/pradipta_Ubuntu_1404_server_x64_basic_{{.BuildName}}_{{.Provider}}_{{.ArtifactId}}.box",
+				"vagrantfile_template":"pradipta_Ubuntu_1404_server_x64_basic_vagrantfile.template"
+			}
+		}
+	}]
+}
